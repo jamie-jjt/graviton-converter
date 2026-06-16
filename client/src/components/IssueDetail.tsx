@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Code, FileText, Info, Lightbulb, Sparkles, Send, EyeOff, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Code, FileText, Info, Lightbulb, Sparkles, Send, EyeOff, Loader2, Undo2 } from 'lucide-react';
 import { ConversionIssue, ScanResult, Severity } from '../types';
-import { manualResolve, ignoreIssue, getScanResult } from '../api';
+import { manualResolve, ignoreIssue, getScanResult, rollbackIssue } from '../api';
 import { clsx } from 'clsx';
 
 interface IssueDetailProps {
@@ -199,18 +199,34 @@ export function IssueDetail({ issue, scanId, onUpdateResult, onBack }: IssueDeta
       {/* Already Resolved State */}
       {issue.status !== 'unresolved' && (
         <div className="glass-panel p-5 border-emerald-500/30">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-            <div>
-              <h3 className="text-sm font-semibold text-emerald-300">
-                {issue.status === 'auto-resolved' ? 'Auto-Resolved' : issue.status === 'manually-resolved' ? 'Manually Resolved' : 'Ignored'}
-              </h3>
-              {issue.resolution && (
-                <div className="code-block mt-2 text-xs">
-                  <code className="text-emerald-300">{issue.resolution}</code>
-                </div>
-              )}
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+              <div>
+                <h3 className="text-sm font-semibold text-emerald-300">
+                  {issue.status === 'auto-resolved' ? 'Auto-Resolved' : issue.status === 'manually-resolved' ? 'Manually Resolved' : 'Ignored'}
+                </h3>
+                {issue.resolution && (
+                  <div className="code-block mt-2 text-xs">
+                    <code className="text-emerald-300">{issue.resolution}</code>
+                  </div>
+                )}
+              </div>
             </div>
+            <button
+              onClick={async () => {
+                try {
+                  await rollbackIssue(scanId, issue.id);
+                  const updated = await getScanResult(scanId);
+                  onUpdateResult(updated);
+                  onBack();
+                } catch {}
+              }}
+              className="btn-danger flex items-center gap-2 text-sm"
+            >
+              <Undo2 className="w-4 h-4" />
+              Rollback
+            </button>
           </div>
         </div>
       )}

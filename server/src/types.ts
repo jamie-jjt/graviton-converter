@@ -34,7 +34,10 @@ export type IssueCategory =
   | 'assembly'
   | 'binary-dependency'
   | 'package-manager'
-  | 'runtime-config';
+  | 'runtime-config'
+  | 'cicd-pipeline'
+  | 'infrastructure'
+  | 'binary-file';
 
 export interface ResolutionSuggestion {
   id: string;
@@ -71,4 +74,62 @@ export interface ProjectInfo {
   buildSystem: string;
   packageManager?: string;
   dockerized: boolean;
+}
+
+// --- New types for extended features ---
+
+export interface ScanHistory {
+  scans: ScanResult[];
+  comparisons: ScanComparison[];
+}
+
+export interface ScanComparison {
+  before: ScanSummary;
+  after: ScanSummary;
+  newIssues: string[];
+  resolvedIssues: string[];
+}
+
+export interface MigrationReport {
+  id: string;
+  scanId: string;
+  generatedAt: string;
+  summary: ScanSummary;
+  issues: ConversionIssue[];
+  recommendations: string[];
+  estimatedSavings?: CostEstimate;
+}
+
+export interface DiffPreview {
+  file: string;
+  original: string;
+  modified: string;
+  hunks: DiffHunk[];
+}
+
+export interface DiffHunk {
+  startLine: number;
+  endLine: number;
+  original: string;
+  modified: string;
+}
+
+export interface BatchResolution {
+  issueIds: string[];
+  suggestionId: string;
+}
+
+export interface CostEstimate {
+  currentMonthly: number;
+  projectedMonthly: number;
+  savings: number;
+  savingsPercent: number;
+  instances: InstanceMapping[];
+}
+
+export interface InstanceMapping {
+  current: string;
+  suggested: string;
+  currentCost: number;
+  suggestedCost: number;
 }

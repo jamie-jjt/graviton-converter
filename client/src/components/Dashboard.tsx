@@ -1,6 +1,6 @@
-import { AlertTriangle, CheckCircle2, Info, Zap, FileSearch, Shield, ArrowRight, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, Zap, FileSearch, Shield, ArrowRight, Loader2, DollarSign, FileText, GitBranch, Download } from 'lucide-react';
 import { ScanResult } from '../types';
-import { autoResolve, getScanResult } from '../api';
+import { autoResolve, getCostEstimate, getMarkdownReport, generatePR } from '../api';
 import { useState } from 'react';
 
 interface DashboardProps {
@@ -11,6 +11,10 @@ interface DashboardProps {
 
 export function Dashboard({ result, onViewIssues, onUpdateResult }: DashboardProps) {
   const [resolving, setResolving] = useState(false);
+  const [costEstimate, setCostEstimate] = useState<any>(null);
+  const [loadingCost, setLoadingCost] = useState(false);
+  const [prInfo, setPrInfo] = useState<any>(null);
+  const [loadingPr, setLoadingPr] = useState(false);
   const { summary } = result;
 
   const handleAutoResolve = async () => {
@@ -22,6 +26,46 @@ export function Dashboard({ result, onViewIssues, onUpdateResult }: DashboardPro
       // Handle error silently
     } finally {
       setResolving(false);
+    }
+  };
+
+  const handleGetCostEstimate = async () => {
+    setLoadingCost(true);
+    try {
+      const estimate = await getCostEstimate(result.id);
+      setCostEstimate(estimate);
+    } catch {
+      // No infra issues found
+      setCostEstimate({ currentMonthly: 0, projectedMonthly: 0, savings: 0, savingsPercent: 0, instances: [] });
+    } finally {
+      setLoadingCost(false);
+    }
+  };
+
+  const handleExportReport = async () => {
+    try {
+      const markdown = await getMarkdownReport(result.id);
+      const blob = new Blob([markdown], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `graviton-report-${result.id.slice(0, 8)}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Handle error
+    }
+  };
+
+  const handleGeneratePR = async () => {
+    setLoadingPr(true);
+    try {
+      const pr = await generatePR(result.id);
+      setPrInfo(pr);
+    } catch {
+      // Handle error
+    } finally {
+      setLoadingPr(false);
     }
   };
 
@@ -138,6 +182,92 @@ export function Dashboard({ result, onViewIssues, onUpdateResult }: DashboardPro
           ))}
         </div>
       </div>
+
+      {/* Actions Row */}
+      <div className="grid grid-cols-3 gap-4">
+        <button onClick={handleGetCostEstimate} disabled={loadingCost} className="glass-panel-hover p-4 flex flex-col items-center gap-2 text-center">
+          {loadingCost ? <Loader2 className="w-5 h-5 animate-spin text-graviton-400" /> : <DollarSign className="w-5 h-5 text-emerald-400" />}
+          <span className="text-sm font-medium text-gray-200">Cost Estimate</span>
+          <span className="text-xs text-gray-500">Graviton savings</span>
+        </button>
+        <button onClick={handleExportReport} className="glass-panel-hover p-4 flex flex-col items-center gap-2 text-center">
+          <Download className="w-5 h-5 text-blue-400" />
+          <span className="text-sm font-medium text-gray-200">Export Report</span>
+          <span className="text-xs text-gray-500">Markdown download</span>
+        </button>
+        <button onClick={handleGeneratePR} disabled={loadingPr} className="glass-panel-hover p-4 flex flex-col items-center gap-2 text-center">
+          {loadingPr ? <Loader2 className="w-5 h-5 animate-spin text-graviton-400" /> : <GitBranch className="w-5 h-5 text-purple-400" />}
+          <span className="text-sm font-medium text-gray-200">Generate PR</span>
+          <span className="text-xs text-gray-500">Migration branch</span>
+        </button>
+      </div>
+
+      {/* Cost Estimate Panel */}
+      {costEstimate && (
+        <div className="glass-panel p-6">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-emerald-400" />
+            Cost Savings Estimate
+          </h3>
+          {costEstimate.instances.length > 0 ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-red-400">${costEstimate.currentMonthly.toFixed(2)}</p>
+                  <p className="text-xs text-gray-400">Current /mo</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-emerald-400">${costEstimate.projectedMonthly.toFixed(2)}</p>
+                  <p className="text-xs text-gray-400">Graviton /mo</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-aws-orange">{costEstimate.savingsPercent.toFixed(1)}%</p>
+                  <p className="text-xs text-gray-400">Savings</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {costEstimate.instances.map((inst: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between text-sm">
+                    <span className="font-mono text-gray-300">{inst.current} → {inst.suggested}</span>
+                    <span className="text-emerald-400">${(inst.currentCost - inst.suggestedCost).toFixed(2)}/mo saved</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">No infrastructure instance types detected. Add Terraform or CloudFormation files for cost analysis.</p>
+          )}
+        </div>
+      )}
+
+      {/* PR Preview Panel */}
+      {prInfo && (
+        <div className="glass-panel p-6">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <GitBranch className="w-5 h-5 text-purple-400" />
+            Migration PR Preview
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Branch:</span>
+              <code className="text-sm text-purple-300 bg-gray-800 px-2 py-0.5 rounded">{prInfo.branch}</code>
+            </div>
+            <div>
+              <span className="text-xs text-gray-500">Title:</span>
+              <p className="text-sm text-gray-200 mt-1">{prInfo.title}</p>
+            </div>
+            <div className="flex gap-4 text-sm">
+              <span className="text-gray-400">{prInfo.stats.filesChanged} files changed</span>
+              <span className="text-emerald-400">{prInfo.stats.issuesResolved} resolved</span>
+              <span className="text-amber-400">{prInfo.stats.issuesRemaining} remaining</span>
+            </div>
+            <details className="mt-2">
+              <summary className="text-xs text-graviton-400 cursor-pointer hover:text-graviton-300">View full PR description</summary>
+              <pre className="mt-2 text-xs text-gray-400 bg-gray-900 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">{prInfo.body}</pre>
+            </details>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -173,6 +303,9 @@ function getCategoryBreakdown(result: ScanResult) {
     'binary-dependency': 'Binary Dependencies',
     'package-manager': 'Package Manager',
     'runtime-config': 'Runtime Configuration',
+    'cicd-pipeline': 'CI/CD Pipeline',
+    'infrastructure': 'Infrastructure (IaC)',
+    'binary-file': 'Binary Files',
   };
 
   return Array.from(categories.entries())

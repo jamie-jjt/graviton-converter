@@ -4,6 +4,9 @@ import { glob } from 'glob';
 import { ConversionIssue, ScanResult, ScanSource, ScanSummary } from '../types';
 import { detectionRules, DetectionRule } from './rules';
 import { v4Generator } from '../utils/id';
+import { BinaryDetector } from './binary-detector';
+import { CicdScanner } from './cicd-scanner';
+import { InfraScanner } from './infra-scanner';
 
 const IGNORED_DIRS = ['node_modules', '.git', 'dist', 'build', '__pycache__', '.venv', 'venv', 'target', 'vendor'];
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB
@@ -37,6 +40,15 @@ export class Scanner {
         // Skip files that can't be read
       }
     }
+
+    // Run additional scanners in parallel
+    const [binaryIssues, cicdIssues, infraIssues] = await Promise.all([
+      new BinaryDetector(this.scanPath).detect(),
+      new CicdScanner(this.scanPath).scan(),
+      new InfraScanner(this.scanPath).scan(),
+    ]);
+
+    issues.push(...binaryIssues, ...cicdIssues, ...infraIssues);
 
     return { issues, totalFiles, scannedFiles };
   }

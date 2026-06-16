@@ -57,6 +57,9 @@ export function IssueList({ result, onSelectIssue, onUpdateResult }: IssueListPr
     'binary-dependency': 'Binaries',
     'package-manager': 'Pkg Manager',
     'runtime-config': 'Runtime',
+    'cicd-pipeline': 'CI/CD',
+    'infrastructure': 'Infrastructure',
+    'binary-file': 'Binary Files',
   };
 
   return (
