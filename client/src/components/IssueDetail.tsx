@@ -16,6 +16,10 @@ export function IssueDetail({ issue, scanId, onUpdateResult, onBack }: IssueDeta
   const [resolving, setResolving] = useState(false);
   const [ignoring, setIgnoring] = useState(false);
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
+  const [overrideNoChange, setOverrideNoChange] = useState(false);
+
+  // Determine if this is a "no change needed" issue (intrinsic usage with sse2neon)
+  const isNoChangeNeeded = issue.category === 'intrinsics' && issue.severity === 'info';
 
   const handleManualResolve = async () => {
     if (!manualCode.trim()) return;
@@ -156,8 +160,69 @@ export function IssueDetail({ issue, scanId, onUpdateResult, onBack }: IssueDeta
         </div>
       </div>
 
-      {/* Manual Resolution Editor */}
-      {issue.status === 'unresolved' && (
+      {/* No Change Needed Mark */}
+      {issue.status === 'unresolved' && isNoChangeNeeded && !overrideNoChange && (
+        <div className="glass-panel p-5 border-emerald-500/20">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-emerald-300 mb-1">No Change Needed</h3>
+              <p className="text-xs text-gray-400 mb-3">
+                This line uses SSE/AVX intrinsics that are fully compatible with <code className="text-emerald-300 bg-gray-800 px-1 rounded">sse2neon.h</code>. 
+                Once the header is replaced (auto-resolved), these function calls work on ARM64 without modification.
+              </p>
+              <button
+                onClick={() => setOverrideNoChange(true)}
+                className="text-xs text-gray-500 hover:text-amber-400 transition-colors underline underline-offset-2"
+              >
+                I still want to change this manually →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Override disclaimer for no-change issues */}
+      {issue.status === 'unresolved' && isNoChangeNeeded && overrideNoChange && (
+        <div className="glass-panel p-5">
+          <div className="px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/30 mb-4">
+            <p className="text-xs text-amber-300 font-medium mb-1">⚠️ Manual Override</p>
+            <p className="text-xs text-amber-200/70">
+              This line is compatible with sse2neon and doesn't need changes. Modifying it manually may break the sse2neon compatibility layer. Proceed only if you're replacing with native NEON intrinsics for performance reasons.
+            </p>
+          </div>
+          <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+            <Code className="w-4 h-4 text-amber-400" />
+            Manual Override
+          </h3>
+          <textarea
+            value={manualCode}
+            onChange={(e) => setManualCode(e.target.value)}
+            rows={6}
+            className="w-full px-4 py-3 bg-gray-900/80 border border-amber-600/30 rounded-lg text-amber-300 font-mono text-sm placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all duration-200 resize-y"
+            placeholder="Enter your manual NEON replacement..."
+            spellCheck={false}
+          />
+          <div className="flex items-center justify-between mt-4">
+            <button onClick={() => setOverrideNoChange(false)} className="text-xs text-gray-400 hover:text-gray-300">
+              ← Cancel override
+            </button>
+            <button
+              onClick={handleManualResolve}
+              disabled={resolving || !manualCode.trim()}
+              className="btn-primary flex items-center gap-2 bg-amber-600 hover:bg-amber-500"
+            >
+              {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Apply Override
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Resolution Editor (normal issues) */}
+      {issue.status === 'unresolved' && !isNoChangeNeeded && (
         <div className="glass-panel p-5">
           <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
             <Code className="w-4 h-4 text-emerald-400" />

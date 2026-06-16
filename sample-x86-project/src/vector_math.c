@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <immintrin.h>
+#include "sse2neon.h"
 
 // Add two float arrays using SSE
 void vector_add(const float *a, const float *b, float *result, int n) {

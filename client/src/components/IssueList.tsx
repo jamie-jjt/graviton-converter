@@ -275,6 +275,11 @@ function IssueRow({ issue, onClick }: { issue: ConversionIssue; onClick: () => v
               <Zap className="w-3 h-3" /> Auto
             </span>
           )}
+          {issue.category === 'intrinsics' && issue.severity === 'info' && issue.status === 'unresolved' && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+              <CheckCircle2 className="w-3 h-3" /> No Change
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-400">
           <span className="font-mono truncate max-w-[300px]">{issue.file}{issue.line ? `:${issue.line}` : ''}</span>

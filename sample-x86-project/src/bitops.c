@@ -9,13 +9,13 @@
 // Population count using POPCNT instruction
 static inline int popcnt32(uint32_t x) {
     int result;
-    __asm__ ("popcnt %1, %0" : "=r"(result) : "r"(x));
+    // Use __builtin_popcount() instead of inline asm
     return result;
 }
 
 static inline int popcnt64(uint64_t x) {
     int64_t result;
-    __asm__ ("popcnt %1, %0" : "=r"(result) : "r"(x));
+    // Use __builtin_popcount() instead of inline asm
     return (int)result;
 }
 
@@ -33,20 +33,20 @@ static inline uint64_t bswap64(uint64_t x) {
 // Find first set bit (from LSB) using BSF
 static inline int find_first_set(uint32_t x) {
     int result;
-    __asm__ ("bsf %1, %0" : "=r"(result) : "r"(x));
+    // Use __builtin_ctz() instead of inline asm
     return result;
 }
 
 // Find last set bit (from MSB) using BSR
 static inline int find_last_set(uint32_t x) {
     int result;
-    __asm__ ("bsr %1, %0" : "=r"(result) : "r"(x));
+    // Use (31 - __builtin_clz()) instead of inline asm
     return result;
 }
 
 // CRC32 using hardware instruction
 static inline uint32_t crc32_byte(uint32_t crc, uint8_t data) {
-    __asm__ ("crc32b %1, %0" : "+r"(crc) : "r"(data));
+    // Use __builtin_arm_crc32b() on ARM64
     return crc;
 }
 

@@ -28,12 +28,12 @@ static inline uint64_t rdtscp(void) {
 
 // CPU pause for spin-wait loops
 static inline void cpu_relax(void) {
-    __asm__ volatile("pause" ::: "memory");
+    __asm__ volatile("yield" ::: "memory");
 }
 
 // Memory fence
 static inline void memory_barrier(void) {
-    __asm__ volatile("mfence" ::: "memory");
+    __asm__ volatile("dmb ish" ::: "memory");
 }
 
 // Measure execution time of a function
