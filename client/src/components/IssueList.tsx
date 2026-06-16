@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronRight, Filter, Info, Search, Zap, Loader2, Eye, EyeOff } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, Filter, Info, Search, Zap, Loader2, Eye, EyeOff, Sparkles, X } from 'lucide-react';
 import { ConversionIssue, IssueCategory, IssueStatus, ScanResult, Severity } from '../types';
-import { autoResolve } from '../api';
+import { autoResolve, batchResolve, getScanResult } from '../api';
 import { clsx } from 'clsx';
 
 interface IssueListProps {
@@ -17,6 +17,8 @@ export function IssueList({ result, onSelectIssue, onUpdateResult }: IssueListPr
   const [categoryFilter, setCategoryFilter] = useState<IssueCategory | 'all'>('all');
   const [resolving, setResolving] = useState(false);
   const [showResolved, setShowResolved] = useState(false);
+  const [showConfirmAll, setShowConfirmAll] = useState(false);
+  const [resolvingAll, setResolvingAll] = useState(false);
 
   const filteredIssues = result.issues.filter(issue => {
     if (search && !issue.title.toLowerCase().includes(search.toLowerCase()) &&
@@ -41,6 +43,35 @@ export function IssueList({ result, onSelectIssue, onUpdateResult }: IssueListPr
       // Handle error
     } finally {
       setResolving(false);
+    }
+  };
+
+  const handleResolveAllHighestConfidence = async () => {
+    setResolvingAll(true);
+    setShowConfirmAll(false);
+    try {
+      // For each unresolved issue with suggestions, pick the highest confidence one
+      const unresolvedWithSuggestions = result.issues.filter(
+        i => i.status === 'unresolved' && i.suggestions.length > 0
+      );
+
+      for (const issue of unresolvedWithSuggestions) {
+        const bestSuggestion = issue.suggestions.reduce((best, s) =>
+          s.confidence > best.confidence ? s : best
+        , issue.suggestions[0]);
+
+        if (bestSuggestion.code) {
+          await batchResolve(result.id, [issue.id], bestSuggestion.code);
+        }
+      }
+
+      // Refresh the result
+      const updated = await getScanResult(result.id);
+      onUpdateResult(updated);
+    } catch {
+      // Handle error
+    } finally {
+      setResolvingAll(false);
     }
   };
 
@@ -79,6 +110,14 @@ export function IssueList({ result, onSelectIssue, onUpdateResult }: IssueListPr
           >
             {showResolved ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
             {showResolved ? 'Hide' : 'Show'} Resolved
+          </button>
+          <button
+            onClick={() => setShowConfirmAll(true)}
+            disabled={resolvingAll}
+            className="btn-primary flex items-center gap-2 text-sm bg-purple-600 hover:bg-purple-500 shadow-purple-900/20"
+          >
+            {resolvingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            Resolve All (Best Match)
           </button>
           <button
             onClick={handleAutoResolve}
@@ -150,6 +189,53 @@ export function IssueList({ result, onSelectIssue, onUpdateResult }: IssueListPr
           </select>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="glass-panel p-6 max-w-md w-full mx-4 border border-purple-500/30 shadow-2xl">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-purple-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Resolve All Issues</h3>
+              </div>
+              <button onClick={() => setShowConfirmAll(false)} className="p-1 hover:bg-gray-700 rounded" aria-label="Close">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <p className="text-sm text-gray-300">
+                This will apply the <span className="text-purple-300 font-medium">highest confidence suggestion</span> to every unresolved issue that has one.
+              </p>
+              <div className="px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <p className="text-sm text-amber-300 font-medium mb-1">⚠️ Are you sure?</p>
+                <p className="text-xs text-amber-200/70">
+                  This action will modify files on disk for local scans. Some suggestions may not be perfect for your use case. Review changes carefully afterward. You can rollback individual issues if needed.
+                </p>
+              </div>
+              <div className="text-xs text-gray-400">
+                <p>{result.issues.filter(i => i.status === 'unresolved' && i.suggestions.length > 0).length} issues will be resolved using their best-match suggestion.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setShowConfirmAll(false)} className="btn-secondary text-sm">
+                Cancel
+              </button>
+              <button
+                onClick={handleResolveAllHighestConfidence}
+                className="btn-primary text-sm bg-purple-600 hover:bg-purple-500 flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                Yes, Resolve All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Issue List */}
       <div className="space-y-2">
