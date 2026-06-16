@@ -1,0 +1,14 @@
+# JVM Options for x86 server
+-Xms512m
+-Xmx2g
+-Xss512k
+-XX:+UseSSE42
+-XX:+UseAVX2
+-XX:UseSSE=4
+-XX:+UseCRC32Intrinsics
+-XX:+UseAES
+-XX:+UseAESIntrinsics
+-XX:+UseSHA
+-server
+-XX:+UseG1GC
+-XX:MaxGCPauseMillis=200

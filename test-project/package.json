@@ -1,0 +1,23 @@
+{
+  "name": "x86-sample-app",
+  "version": "1.0.0",
+  "description": "Sample Node.js app with x86/x64 native dependencies",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "node-gyp rebuild"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "bcrypt": "^5.1.1",
+    "sharp": "^0.32.6",
+    "sqlite3": "^5.1.6",
+    "node-sass": "^9.0.0",
+    "canvas": "^2.11.2",
+    "grpc": "^1.24.11",
+    "farmhash": "^3.3.0"
+  },
+  "devDependencies": {
+    "node-gyp": "^10.0.0"
+  }
+}

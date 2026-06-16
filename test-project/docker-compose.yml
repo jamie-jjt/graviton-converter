@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - JAVA_OPTS=-XX:+UseSSE42 -XX:+UseAVX2 -Xss512k
+
+  redis:
+    image: amd64/redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: amd64/postgres:15
+    environment:
+      POSTGRES_DB: myapp
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
