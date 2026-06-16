@@ -1,0 +1,230 @@
+import { useState } from 'react';
+import { AlertTriangle, CheckCircle2, ChevronRight, Filter, Info, Search, Zap, Loader2, Eye, EyeOff } from 'lucide-react';
+import { ConversionIssue, IssueCategory, IssueStatus, ScanResult, Severity } from '../types';
+import { autoResolve } from '../api';
+import { clsx } from 'clsx';
+
+interface IssueListProps {
+  result: ScanResult;
+  onSelectIssue: (issue: ConversionIssue) => void;
+  onUpdateResult: (result: ScanResult) => void;
+}
+
+export function IssueList({ result, onSelectIssue, onUpdateResult }: IssueListProps) {
+  const [search, setSearch] = useState('');
+  const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<IssueStatus | 'all'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<IssueCategory | 'all'>('all');
+  const [resolving, setResolving] = useState(false);
+  const [showResolved, setShowResolved] = useState(false);
+
+  const filteredIssues = result.issues.filter(issue => {
+    if (search && !issue.title.toLowerCase().includes(search.toLowerCase()) &&
+        !issue.file.toLowerCase().includes(search.toLowerCase())) {
+      return false;
+    }
+    if (severityFilter !== 'all' && issue.severity !== severityFilter) return false;
+    if (statusFilter !== 'all' && issue.status !== statusFilter) return false;
+    if (categoryFilter !== 'all' && issue.category !== categoryFilter) return false;
+    if (!showResolved && (issue.status === 'auto-resolved' || issue.status === 'manually-resolved' || issue.status === 'ignored')) {
+      return false;
+    }
+    return true;
+  });
+
+  const handleAutoResolve = async () => {
+    setResolving(true);
+    try {
+      const updated = await autoResolve(result.id);
+      onUpdateResult(updated);
+    } catch {
+      // Handle error
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  const categories = [...new Set(result.issues.map(i => i.category))];
+
+  const categoryLabels: Record<string, string> = {
+    'architecture-specific-code': 'Arch-Specific',
+    'compiler-flags': 'Compiler Flags',
+    'intrinsics': 'Intrinsics',
+    'library-compatibility': 'Libraries',
+    'docker-image': 'Docker',
+    'build-system': 'Build System',
+    'assembly': 'Assembly',
+    'binary-dependency': 'Binaries',
+    'package-manager': 'Pkg Manager',
+    'runtime-config': 'Runtime',
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Issues</h2>
+          <p className="text-gray-400 text-sm mt-1">
+            {filteredIssues.length} of {result.issues.length} issues shown
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowResolved(!showResolved)}
+            className={clsx('btn-secondary flex items-center gap-2 text-sm', showResolved && 'border-graviton-500/50 text-graviton-300')}
+          >
+            {showResolved ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+            {showResolved ? 'Hide' : 'Show'} Resolved
+          </button>
+          <button
+            onClick={handleAutoResolve}
+            disabled={resolving}
+            className="btn-success flex items-center gap-2 text-sm"
+          >
+            {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            Auto-Resolve All
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="glass-panel p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by file or issue title..."
+              className="input-field pl-9 py-2"
+            />
+          </div>
+
+          {/* Severity Filter */}
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <select
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value as any)}
+              className="input-field py-2 w-auto"
+              aria-label="Filter by severity"
+            >
+              <option value="all">All Severities</option>
+              <option value="critical">Critical</option>
+              <option value="warning">Warning</option>
+              <option value="info">Info</option>
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="input-field py-2 w-auto"
+            aria-label="Filter by status"
+          >
+            <option value="all">All Statuses</option>
+            <option value="unresolved">Unresolved</option>
+            <option value="auto-resolved">Auto-Resolved</option>
+            <option value="manually-resolved">Manual</option>
+            <option value="ignored">Ignored</option>
+          </select>
+
+          {/* Category Filter */}
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value as any)}
+            className="input-field py-2 w-auto"
+            aria-label="Filter by category"
+          >
+            <option value="all">All Categories</option>
+            {categories.map(cat => (
+              <option key={cat} value={cat}>{categoryLabels[cat] || cat}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Issue List */}
+      <div className="space-y-2">
+        {filteredIssues.length === 0 ? (
+          <div className="glass-panel p-12 text-center">
+            <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-white mb-2">No Issues Found</h3>
+            <p className="text-gray-400">
+              {result.issues.length > 0
+                ? 'All matching issues are resolved or filtered out.'
+                : 'Your project appears Graviton-ready!'}
+            </p>
+          </div>
+        ) : (
+          filteredIssues.map(issue => (
+            <IssueRow key={issue.id} issue={issue} onClick={() => onSelectIssue(issue)} />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function IssueRow({ issue, onClick }: { issue: ConversionIssue; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full glass-panel-hover p-4 flex items-center gap-4 text-left"
+    >
+      <SeverityIcon severity={issue.severity} status={issue.status} />
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <h4 className="text-sm font-semibold text-white truncate">{issue.title}</h4>
+          {issue.autoResolvable && issue.status === 'unresolved' && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <Zap className="w-3 h-3" /> Auto
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-xs text-gray-400">
+          <span className="font-mono truncate max-w-[300px]">{issue.file}{issue.line ? `:${issue.line}` : ''}</span>
+          <StatusBadge status={issue.status} />
+        </div>
+      </div>
+
+      <ChevronRight className="w-5 h-5 text-gray-500 shrink-0" />
+    </button>
+  );
+}
+
+function SeverityIcon({ severity, status }: { severity: Severity; status: IssueStatus }) {
+  if (status === 'auto-resolved' || status === 'manually-resolved') {
+    return <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />;
+  }
+  if (status === 'ignored') {
+    return <EyeOff className="w-5 h-5 text-gray-500 shrink-0" />;
+  }
+
+  switch (severity) {
+    case 'critical':
+      return <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />;
+    case 'warning':
+      return <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />;
+    case 'info':
+      return <Info className="w-5 h-5 text-blue-400 shrink-0" />;
+  }
+}
+
+function StatusBadge({ status }: { status: IssueStatus }) {
+  switch (status) {
+    case 'unresolved':
+      return <span className="badge-warning">Unresolved</span>;
+    case 'auto-resolved':
+      return <span className="badge-resolved">Auto-Resolved</span>;
+    case 'manually-resolved':
+      return <span className="badge-resolved">Manually Resolved</span>;
+    case 'ignored':
+      return <span className="badge-info">Ignored</span>;
+  }
+}
