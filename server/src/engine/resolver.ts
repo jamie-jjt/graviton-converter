@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ConversionIssue } from '../types';
+import { FileRewriter } from './file-rewriter';
 
 export class AutoResolver {
   private basePath: string;
@@ -11,15 +12,46 @@ export class AutoResolver {
 
   /**
    * Attempts to auto-resolve all issues that are marked as autoResolvable.
+   * Also tries whole-file rewrites for deeply x86-specific files.
    * Returns the updated list of issues with resolved statuses.
    */
   resolveAll(issues: ConversionIssue[]): ConversionIssue[] {
-    return issues.map(issue => {
+    // First pass: line-by-line auto-resolve
+    let result = issues.map(issue => {
       if (issue.autoResolvable && issue.status === 'unresolved') {
         return this.resolve(issue);
       }
       return issue;
     });
+
+    // Second pass: whole-file rewrites for files with unresolved assembly issues
+    if (this.basePath) {
+      const rewriter = new FileRewriter(this.basePath);
+      const unresolvedAsmFiles = new Set(
+        result
+          .filter(i => i.category === 'assembly' && i.status === 'unresolved')
+          .map(i => i.file)
+      );
+
+      for (const file of unresolvedAsmFiles) {
+        const success = rewriter.rewrite(file);
+        if (success) {
+          // Mark all assembly issues in this file as resolved
+          result = result.map(issue => {
+            if (issue.file === file && issue.category === 'assembly' && issue.status === 'unresolved') {
+              return {
+                ...issue,
+                status: 'auto-resolved' as const,
+                resolution: '⚠️ File rewritten with ARM64-compatible implementation (uses __builtin_* and ARM intrinsics). Review before production use.',
+              };
+            }
+            return issue;
+          });
+        }
+      }
+    }
+
+    return result;
   }
 
   /**
