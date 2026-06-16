@@ -91,9 +91,11 @@ export const detectionRules: DetectionRule[] = [
     ],
     getAutoFix: (match: string) => {
       return match
-        .replace(/-march=(native|x86-64|i686|haswell|broadwell|skylake|znver[1-4])/g, '-march=armv8.2-a+crypto+fp16+rcpc+dotprod')
-        .replace(/-mtune=(generic|intel|haswell|broadwell|skylake|znver[1-4])/g, '-mtune=neoverse-n1')
-        .replace(/-m(sse|sse2|sse3|ssse3|sse4|sse4\.1|sse4\.2|avx|avx2|avx512|fma|bmi|bmi2|popcnt|lzcnt|f16c|aes|sha|pclmul)\b/g, '');
+        .replace(/-march=(native|x86-64|i686|haswell|broadwell|skylake|znver[1-4])\b/g, '-march=armv8.2-a+crypto+fp16+rcpc+dotprod')
+        .replace(/-mtune=(generic|intel|haswell|broadwell|skylake|znver[1-4])\b/g, '-mtune=neoverse-n1')
+        .replace(/-m(sse|sse2|sse3|ssse3|sse4\.2|sse4\.1|sse4|avx2|avx512|avx|fma|bmi2|bmi|popcnt|lzcnt|f16c|aes|sha|pclmul)\b/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
     },
   },
   // Docker Images
@@ -131,7 +133,8 @@ export const detectionRules: DetectionRule[] = [
     getAutoFix: (match: string) => {
       return match
         .replace(/FROM\s+amd64\//g, 'FROM ')
-        .replace(/--platform=linux\/amd64/g, '--platform=$BUILDPLATFORM');
+        .replace(/--platform=linux\/amd64\s*/g, '')
+        .replace(/FROM\s+--platform=\$BUILDPLATFORM\s*/g, 'FROM ');
     },
   },
   // Assembly Code

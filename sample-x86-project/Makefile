@@ -1,6 +1,6 @@
-# Makefile for sample project - multi-architecture support
+# Makefile for x86 sample project
 CC = gcc
-CFLAGS = -O2 -Wall
+CFLAGS = -O2 -march=armv8.2-a+crypto+fp16+rcpc+dotprod -Wall
 LDFLAGS = -lm
 
 SRCDIR = src

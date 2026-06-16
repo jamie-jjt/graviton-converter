@@ -7,22 +7,8 @@
 #include <stdio.h>
 
 // Population count using POPCNT instruction
-#if defined(__x86_64__) || defined(_M_X64)
-  // x86_64 implementation
-#elif defined(__aarch64__)
-  // ARM64/Graviton implementation
-#else
-  #error "Unsupported architecture"
-#endif
-  __asm__ volatile("pause");
-#elif defined(__aarch64__)
-  __asm__ volatile("yield");
-#endif
-    #if defined(__x86_64__)
-  __asm__ volatile("pause");
-#elif defined(__aarch64__)
-  __asm__ volatile("yield");
-#endif
+static inline int popcnt32(uint32_t x) {
+    int result;
     __asm__ ("popcnt %1, %0" : "=r"(result) : "r"(x));
     return result;
 }
@@ -43,11 +29,7 @@ static inline uint64_t bswap64(uint64_t x) {
     __asm__ ("bswap %0" : "+r"(x));
     return x;
 }
-#if defined(__x86_64__)
-  __asm__ volatile("pause");
-#elif defined(__aarch64__)
-  __asm__ volatile("yield");
-#endif
+
 // Find first set bit (from LSB) using BSF
 static inline int find_first_set(uint32_t x) {
     int result;
@@ -61,11 +43,7 @@ static inline int find_last_set(uint32_t x) {
     __asm__ ("bsr %1, %0" : "=r"(result) : "r"(x));
     return result;
 }
-#if defined(__x86_64__)
-  __asm__ volatile("pause");
-#elif defined(__aarch64__)
-  __asm__ volatile("yield");
-#endif
+
 // CRC32 using hardware instruction
 static inline uint32_t crc32_byte(uint32_t crc, uint8_t data) {
     __asm__ ("crc32b %1, %0" : "+r"(crc) : "r"(data));
@@ -91,11 +69,7 @@ int hamming_distance(uint32_t a, uint32_t b) {
 
 // Reverse byte order in a buffer (endian swap)
 void reverse_bytes(uint32_t *data, int n) {
-    #if defined(__x86_64__)
-  __asm__ volatile("pause");
-#elif defined(__aarch64__)
-  __asm__ volatile("yield");
-#endif
+    for (int i = 0; i < n; i++) {
         data[i] = bswap32(data[i]);
     }
 }

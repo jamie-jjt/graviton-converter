@@ -39,26 +39,12 @@ static inline void memory_barrier(void) {
 // Measure execution time of a function
 typedef void (*bench_fn)(void);
 
-#if defined(__x86_64__) || defined(_M_X64)
-  // x86_64 implementation
-#elif defined(__aarch64__)
-  // ARM64/Graviton implementation
-#else
-  #error "Unsupported architecture"
-#endif
-  __asm__ volatile("pause");
-#elif defined(__aarch64__)
-  __asm__ volatile("yield");
-#endif
+double measure_cycles(bench_fn fn, int iterations) {
     uint64_t start, end;
     uint64_t total = 0;
 
     // Warmup
-    #if defined(__x86_64__)
-  __asm__ volatile("pause");
-#elif defined(__aarch64__)
-  __asm__ volatile("yield");
-#endif
+    for (int i = 0; i < 10; i++) {
         fn();
     }
 

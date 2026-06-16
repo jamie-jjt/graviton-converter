@@ -1,6 +1,6 @@
 /**
- * main.c - Sample application with multi-architecture support
- * Works on both x86_64 and ARM64/Graviton
+ * main.c - Sample x86 application
+ * Demonstrates various x86-specific features
  */
 
 #include <stdio.h>
@@ -20,7 +20,7 @@ extern int count_leading_zeros(uint32_t x);
 #define N 1024
 
 int main(void) {
-    printf("=== Sample Application (Multi-Arch) ===\n\n");
+    printf("=== x86 Sample Application ===\n\n");
 
     // CPU detection
     print_cpu_info();
