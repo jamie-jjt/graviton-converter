@@ -22,31 +22,26 @@ static inline cpuid_result_t cpuid(uint32_t leaf, uint32_t subleaf) {
     return result;
 }
 
-// Check if SSE4.2 is supported
 int has_sse42(void) {
     cpuid_result_t r = cpuid(1, 0);
     return (r.ecx >> 20) & 1;
 }
 
-// Check if AVX is supported
 int has_avx(void) {
     cpuid_result_t r = cpuid(1, 0);
     return (r.ecx >> 28) & 1;
 }
 
-// Check if AVX2 is supported
 int has_avx2(void) {
     cpuid_result_t r = cpuid(7, 0);
     return (r.ebx >> 5) & 1;
 }
 
-// Check if POPCNT is supported
 int has_popcnt(void) {
     cpuid_result_t r = cpuid(1, 0);
     return (r.ecx >> 23) & 1;
 }
 
-// Get CPU vendor string
 void get_cpu_vendor(char *vendor) {
     cpuid_result_t r = cpuid(0, 0);
     *(uint32_t *)(vendor + 0) = r.ebx;

@@ -16,7 +16,7 @@ static inline uint64_t rdtsc(void) {
     return ((uint64_t)hi << 32) | lo;
 }
 
-// Serializing read (waits for all prior instructions to complete)
+// Serializing read
 static inline uint64_t rdtscp(void) {
     uint32_t lo, hi, aux;
     __asm__ volatile (
