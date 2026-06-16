@@ -14,46 +14,62 @@ export interface DetectionRule {
 }
 
 export const detectionRules: DetectionRule[] = [
-  // x86/x64 Intrinsics
+  // x86/x64 Intrinsics Header - AUTO-RESOLVABLE (replace with sse2neon)
   {
-    id: 'intrinsics-sse',
+    id: 'intrinsics-header',
     category: 'intrinsics',
     severity: 'critical',
-    title: 'x86 SSE/AVX Intrinsics Detected',
-    description: 'SSE/AVX intrinsics are x86-specific and must be replaced with NEON equivalents for Graviton.',
+    title: 'x86 Intrinsics Header - Replace with sse2neon.h',
+    description: 'This header provides x86 SSE/AVX intrinsics. Replace with sse2neon.h which provides ARM NEON implementations of the same functions.',
     filePatterns: [/\.(c|cpp|cc|cxx|h|hpp)$/i],
     contentPatterns: [
-      /_mm_(set|load|store|add|sub|mul|div|and|or|xor|cmp|shuffle|blend|extract|insert|min|max|sqrt|rsqrt|rcp|hadd|hsub|movemask|cvt|cast|stream|prefetch|pause|clflush|fence|mfence|sfence|lfence)\w*\s*\(/,
-      /_mm256_\w+\s*\(/,
-      /_mm512_\w+\s*\(/,
-      /#include\s*<(x|e|p|t|s|n|w|a|i)mmintrin\.h>/,
       /#include\s*<immintrin\.h>/,
+      /#include\s*<xmmintrin\.h>/,
+      /#include\s*<emmintrin\.h>/,
+      /#include\s*<pmmintrin\.h>/,
+      /#include\s*<tmmintrin\.h>/,
+      /#include\s*<smmintrin\.h>/,
+      /#include\s*<nmmintrin\.h>/,
+      /#include\s*<wmmintrin\.h>/,
     ],
-    autoResolvable: false,
-    getSuggestions: (match: string) => [
+    autoResolvable: true,
+    getSuggestions: () => [
       {
         id: 'sse-to-neon-lib',
         title: 'Use sse2neon translation library',
-        description: 'sse2neon is a header-only library that provides NEON implementations of SSE intrinsics. Add #include "sse2neon.h" and link the library.',
-        code: '#include "sse2neon.h" // Drop-in replacement for SSE intrinsics on ARM',
-        confidence: 85,
+        description: 'sse2neon is a header-only library that provides NEON implementations of SSE intrinsics. Drop-in replacement — all _mm_* functions work unchanged.',
+        code: '#include "sse2neon.h"',
+        confidence: 95,
         source: 'AWS Graviton Getting Started Guide',
       },
+    ],
+    getAutoFix: (match: string) => {
+      return match.replace(/#include\s*<[a-z]*mmintrin\.h>/, '#include "sse2neon.h"');
+    },
+  },
+  // x86/x64 Intrinsics Usage - INFO ONLY (works with sse2neon, no fix needed)
+  {
+    id: 'intrinsics-usage',
+    category: 'intrinsics',
+    severity: 'info',
+    title: 'x86 SSE/AVX Intrinsic Usage',
+    description: 'This code uses SSE/AVX intrinsics. These will work on ARM64 if sse2neon.h is included instead of immintrin.h. No change needed to this line.',
+    filePatterns: [/\.(c|cpp|cc|cxx|h|hpp)$/i],
+    contentPatterns: [
+      /_mm_(set|load|store|add|sub|mul|div|and|or|xor|cmp|shuffle|blend|extract|insert|min|max|sqrt|rsqrt|rcp|hadd|hsub|movemask|cvt|cast|stream|prefetch|pause|clflush|fence|mfence|sfence|lfence|setzero|set1|loadu|storeu|cmpestri)\w*\s*\(/,
+      /_mm256_\w+\s*\(/,
+      /_mm512_\w+\s*\(/,
+      /\b__m128[id]?\b/,
+      /\b__m256[id]?\b/,
+    ],
+    autoResolvable: false,
+    getSuggestions: () => [
       {
-        id: 'sse-to-neon-manual',
-        title: 'Manually convert to ARM NEON intrinsics',
-        description: 'Replace each SSE intrinsic with its ARM NEON equivalent. This provides best performance but requires deep knowledge of both ISAs.',
-        code: '#include <arm_neon.h>\n// Example: _mm_add_ps(a, b) → vaddq_f32(a, b)',
-        confidence: 70,
-        source: 'ARM NEON Programmer Guide',
-      },
-      {
-        id: 'sse-conditional-compile',
-        title: 'Use conditional compilation',
-        description: 'Use preprocessor macros to provide both x86 and ARM implementations.',
-        code: '#if defined(__x86_64__) || defined(_M_X64)\n  #include <immintrin.h>\n  // x86 implementation\n#elif defined(__aarch64__)\n  #include <arm_neon.h>\n  // ARM NEON implementation\n#endif',
+        id: 'sse2neon-compat',
+        title: 'Compatible with sse2neon — no change needed',
+        description: 'This intrinsic is supported by sse2neon.h. Ensure the header replacement is applied and this line will work on ARM64 as-is.',
         confidence: 90,
-        source: 'Best Practice',
+        source: 'sse2neon compatibility matrix',
       },
     ],
   },
@@ -150,24 +166,39 @@ export const detectionRules: DetectionRule[] = [
       /\basm\s*(volatile\s*)?\(/,
       /__asm\s*\{/,
     ],
-    autoResolvable: false,
+    autoResolvable: true,
     getSuggestions: () => [
       {
         id: 'asm-to-c',
-        title: 'Replace with portable C/C++ code',
-        description: 'Modern compilers generate efficient code. Replace inline assembly with equivalent C/C++ that the compiler can optimize for any architecture.',
-        confidence: 75,
-        source: 'Best Practice',
+        title: 'Replace with portable C/C++ built-in',
+        description: 'Use compiler built-ins (__builtin_*) which work on both x86 and ARM64.',
+        confidence: 85,
+        source: 'GCC Built-in Functions',
       },
       {
-        id: 'asm-conditional',
-        title: 'Add ARM64 assembly alongside x86',
-        description: 'Use preprocessor guards to provide both x86 and ARM64 assembly implementations.',
-        code: '#if defined(__x86_64__)\n  __asm__ volatile("pause");\n#elif defined(__aarch64__)\n  __asm__ volatile("yield");\n#endif',
+        id: 'asm-arm64-equivalent',
+        title: 'Replace with ARM64 equivalent instruction',
+        description: 'Use the ARM64 equivalent assembly instruction.',
         confidence: 80,
-        source: 'AWS Graviton Porting Guide',
+        source: 'ARM Architecture Reference Manual',
       },
     ],
+    getAutoFix: (match: string) => {
+      // Replace known x86 asm patterns with ARM64 equivalents
+      if (match.includes('"pause"')) return match.replace('"pause"', '"yield"');
+      if (match.includes('"mfence"')) return match.replace('"mfence"', '"dmb ish"');
+      if (match.includes('"sfence"')) return match.replace('"sfence"', '"dmb ishst"');
+      if (match.includes('"lfence"')) return match.replace('"lfence"', '"dmb ishld"');
+      if (match.includes('"rdtsc"')) return match.replace(/\"rdtsc\"[^)]*/, '"mrs %0, cntvct_el0" : "=r"(lo)');
+      if (match.includes('"rdtscp"')) return match.replace(/\"rdtscp\"[^)]*/, '"mrs %0, cntvct_el0" : "=r"(lo)');
+      if (match.includes('"cpuid"')) return match.replace(/\"cpuid\"[^)]*/, '"mrs %0, midr_el1" : "=r"(result.eax)');
+      if (match.includes('"bswap"')) return match.replace('"bswap %0"', '"rev %0, %0"');
+      if (match.includes('"popcnt')) return '// Use __builtin_popcount() instead of inline asm';
+      if (match.includes('"bsf')) return '// Use __builtin_ctz() instead of inline asm';
+      if (match.includes('"bsr')) return '// Use (31 - __builtin_clz()) instead of inline asm';
+      if (match.includes('"crc32')) return '// Use __builtin_arm_crc32b() on ARM64';
+      return undefined as any; // No auto-fix available
+    },
   },
   // Library Compatibility
   {

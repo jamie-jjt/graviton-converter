@@ -108,7 +108,7 @@ export class Scanner {
       description: rule.description,
       originalCode: fullLine.trim(),
       suggestedFix: autoFix,
-      autoResolvable: rule.autoResolvable,
+      autoResolvable: rule.autoResolvable && !!autoFix,
       suggestions,
     };
   }
