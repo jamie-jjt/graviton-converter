@@ -61,7 +61,19 @@ export class AutoResolver {
       // Apply the fix: replace the original code portion within the line
       // preserving leading whitespace
       const leadingWhitespace = originalLine.match(/^(\s*)/)?.[1] || '';
-      const cleanFix = issue.suggestedFix.replace(/\r/g, '').trim();
+      let cleanFix = issue.suggestedFix.replace(/\r/g, '').trim();
+
+      // If the fix contains newlines, it's a multi-line suggestion meant as a snippet.
+      // Only use it if it's a single-line replacement.
+      if (cleanFix.includes('\n')) {
+        // Take just the first non-comment line as the replacement
+        const firstLine = cleanFix.split('\n').find(l => l.trim() && !l.trim().startsWith('//') && !l.trim().startsWith('#'));
+        if (firstLine) {
+          cleanFix = firstLine.trim();
+        } else {
+          return issue; // Can't safely apply multi-line fix
+        }
+      }
 
       if (!cleanFix) {
         // Empty fix means remove the line content (e.g., removing an x86 flag)
@@ -127,7 +139,16 @@ export class AutoResolver {
 
       // Apply the resolution: replace the line content, preserve indentation
       const leadingWhitespace = originalLine.match(/^(\s*)/)?.[1] || '';
-      const cleanResolution = resolution.replace(/\r/g, '').trim();
+      let cleanResolution = resolution.replace(/\r/g, '').trim();
+
+      // If multi-line, take just the first meaningful line
+      if (cleanResolution.includes('\n')) {
+        const firstLine = cleanResolution.split('\n').find(l => l.trim() && !l.trim().startsWith('//') && !l.trim().startsWith('#'));
+        if (firstLine) {
+          cleanResolution = firstLine.trim();
+        }
+      }
+
       lines[lineIndex] = leadingWhitespace + cleanResolution;
 
       // Write to disk

@@ -146,9 +146,9 @@ export const detectionRules: DetectionRule[] = [
     description: 'Inline assembly using x86 instructions must be rewritten for ARM64.',
     filePatterns: [/\.(c|cpp|cc|cxx|h|hpp|s|S|asm)$/i],
     contentPatterns: [
-      /__asm__\s*(\(\s*"|\{)/,
-      /asm\s*(volatile)?\s*\(/,
-      /\b(mov|push|pop|call|ret|jmp|je|jne|jz|jnz|cmp|test|lea|xor|add|sub|mul|div|inc|dec|shl|shr|and|or|not|nop|int|syscall|cpuid|rdtsc|bswap|xchg|lock)\b\s/,
+      /__asm__\s*(volatile\s*)?\(/,
+      /\basm\s*(volatile\s*)?\(/,
+      /__asm\s*\{/,
     ],
     autoResolvable: false,
     getSuggestions: () => [
