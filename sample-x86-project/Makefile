@@ -1,6 +1,6 @@
 # Makefile for x86 sample project
 CC = gcc
-CFLAGS = -O2 -march=armv8.2-a+crypto+fp16+rcpc+dotprod -Wall
+CFLAGS = -O2 -march=armv8.2-a+crypto+fp16+rcpc+dotprod -Wall -I.
 LDFLAGS = -lm
 
 SRCDIR = src
