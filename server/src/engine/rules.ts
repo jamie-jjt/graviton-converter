@@ -106,12 +106,18 @@ export const detectionRules: DetectionRule[] = [
       },
     ],
     getAutoFix: (match: string) => {
-      return match
+      let fixed = match
         .replace(/-march=(native|x86-64|i686|haswell|broadwell|skylake|znver[1-4])\b/g, '-march=armv8.2-a+crypto+fp16+rcpc+dotprod')
         .replace(/-mtune=(generic|intel|haswell|broadwell|skylake|znver[1-4])\b/g, '-mtune=neoverse-n1')
         .replace(/-m(sse|sse2|sse3|ssse3|sse4\.2|sse4\.1|sse4|avx2|avx512|avx|fma|bmi2|bmi|popcnt|lzcnt|f16c|aes|sha|pclmul)\b/g, '')
         .replace(/\s{2,}/g, ' ')
         .trim();
+      // Add -I. so gcc can find sse2neon.h from subdirectories
+      if (!fixed.includes('-I.')) {
+        fixed = fixed.replace(/-Wall/, '-Wall -I.');
+        if (!fixed.includes('-I.')) fixed += ' -I.';
+      }
+      return fixed;
     },
   },
   // Docker Images
