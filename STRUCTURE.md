@@ -232,14 +232,21 @@ Project Detection:
 ## Docker ARM64 Validation
 
 ```bash
-# One-time setup
+# One-time setup: create ARM64 builder with QEMU emulation
 docker buildx create --name arm64builder --platform linux/arm64 --use
 
-# Build on ARM64
+# Build on ARM64 (from inside the project folder with Dockerfile)
 docker buildx build --builder arm64builder --platform linux/arm64 --no-cache --load -t graviton-test .
 
-# Run
+# Run the compiled ARM64 binary
 docker run --platform linux/arm64 graviton-test
+
+# Alternative: use default builder (if custom builder has TLS issues)
+docker build --platform linux/arm64 --no-cache -t graviton-test .
+docker run --platform linux/arm64 graviton-test
+
+# Debug: list files in container to find binary name
+docker run --platform linux/arm64 graviton-test ls -la
 ```
 
 ---

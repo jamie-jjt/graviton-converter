@@ -58,14 +58,33 @@ Open http://localhost:5173
 
 ## Testing with Docker
 
-After resolving, validate the conversion:
+After resolving, validate the conversion builds and runs on ARM64:
 
 ```bash
-cd sample-x86-project
-docker buildx create --name arm64builder --platform linux/arm64 --use  # first time only
+# One-time setup: create an ARM64 builder
+docker buildx create --name arm64builder --platform linux/arm64 --use
+
+# Build the project targeting ARM64
 docker buildx build --builder arm64builder --platform linux/arm64 --no-cache --load -t graviton-test .
+
+# Run the ARM64 binary (uses QEMU emulation on x86 host)
 docker run --platform linux/arm64 graviton-test
 ```
+
+If you get TLS/certificate errors with the custom builder, use the default builder:
+```bash
+docker build --platform linux/arm64 --no-cache -t graviton-test .
+docker run --platform linux/arm64 graviton-test
+```
+
+### Troubleshooting Docker
+
+| Error | Fix |
+|-------|-----|
+| `certificate signed by unknown authority` | Disconnect VPN, or use default builder instead of arm64builder |
+| `./a.out: no such file` | The CMD in Dockerfile doesn't match the Makefile's output binary. Check with `docker run graviton-test ls` |
+| `bad value for -march` | The build is still using x86 gcc. Add `--no-cache` to force fresh ARM64 image pull |
+| `sse2neon.h: No such file` | Re-run auto-resolve to regenerate sse2neon.h, or add `-I.` to CFLAGS |
 
 ## Architecture
 
