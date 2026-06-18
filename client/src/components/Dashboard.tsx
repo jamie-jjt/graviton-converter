@@ -194,6 +194,12 @@ export function Dashboard({ result, onViewIssues, onUpdateResult }: DashboardPro
       </div>
 
       {/* Project Info Panel */}
+      {!projectInfo && result.source.type === 'local' && (
+        <div className="glass-panel p-5 flex items-center justify-center gap-3">
+          <Loader2 className="w-4 h-4 animate-spin text-graviton-400" />
+          <span className="text-sm text-gray-400">Detecting project info...</span>
+        </div>
+      )}
       {projectInfo && (
         <div className="glass-panel p-5">
           <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
