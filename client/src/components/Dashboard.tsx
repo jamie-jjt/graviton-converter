@@ -1,7 +1,7 @@
-import { AlertTriangle, CheckCircle2, Info, Zap, FileSearch, Shield, ArrowRight, Loader2, DollarSign, FileText, GitBranch, Download } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, Zap, FileSearch, Shield, ArrowRight, Loader2, DollarSign, FileText, GitBranch, Download, EyeOff, FileCode } from 'lucide-react';
 import { ScanResult } from '../types';
-import { autoResolve, getCostEstimate, getMarkdownReport, generatePR } from '../api';
-import { useState } from 'react';
+import { autoResolve, getCostEstimate, getMarkdownReport, generatePR, getScanResult, getProjectInfo, generateDockerfile, generateMissingFile } from '../api';
+import { useState, useEffect } from 'react';
 
 interface DashboardProps {
   result: ScanResult;
@@ -15,7 +15,17 @@ export function Dashboard({ result, onViewIssues, onUpdateResult }: DashboardPro
   const [loadingCost, setLoadingCost] = useState(false);
   const [prInfo, setPrInfo] = useState<any>(null);
   const [loadingPr, setLoadingPr] = useState(false);
+  const [projectInfo, setProjectInfo] = useState<any>(null);
+  const [generatingDockerfile, setGeneratingDockerfile] = useState(false);
+  const [generateSuccess, setGenerateSuccess] = useState<string | null>(null);
   const { summary } = result;
+
+  // Load project info on mount
+  useEffect(() => {
+    if (result.source.type === 'local') {
+      getProjectInfo(result.id).then(setProjectInfo).catch(() => {});
+    }
+  }, [result.id]);
 
   const handleAutoResolve = async () => {
     setResolving(true);
@@ -26,6 +36,37 @@ export function Dashboard({ result, onViewIssues, onUpdateResult }: DashboardPro
       // Handle error silently
     } finally {
       setResolving(false);
+    }
+  };
+
+  const handleIgnoreIntrinsicUsage = async () => {
+    try {
+      // Ignore all intrinsic-usage (info severity) issues via batch
+      const intrinsicUsageIds = result.issues
+        .filter(i => i.category === 'intrinsics' && i.severity === 'info' && i.status === 'unresolved')
+        .map(i => i.id);
+
+      for (const id of intrinsicUsageIds) {
+        await fetch(`/api/scan/${result.id}/ignore/${id}`, { method: 'POST' });
+      }
+
+      const updated = await getScanResult(result.id);
+      onUpdateResult(updated);
+    } catch {
+      // Handle error
+    }
+  };
+
+  const handleGenerateDockerfile = async () => {
+    setGeneratingDockerfile(true);
+    try {
+      await generateDockerfile(result.id);
+      const info = await getProjectInfo(result.id);
+      setProjectInfo(info);
+    } catch {
+      // Handle error
+    } finally {
+      setGeneratingDockerfile(false);
     }
   };
 
@@ -69,11 +110,23 @@ export function Dashboard({ result, onViewIssues, onUpdateResult }: DashboardPro
     }
   };
 
-  const readinessScore = Math.round(
-    ((summary.scannedFiles - summary.totalIssues + summary.resolved) / Math.max(summary.scannedFiles, 1)) * 100
+  // Readiness: exclude intrinsic-usage (info) issues since they work via sse2neon
+  const actionableIssues = result.issues.filter(
+    i => !(i.category === 'intrinsics' && i.severity === 'info')
   );
+  const actionableResolved = actionableIssues.filter(
+    i => i.status === 'auto-resolved' || i.status === 'manually-resolved' || i.status === 'ignored'
+  );
+  const readinessScore = actionableIssues.length > 0
+    ? Math.round((actionableResolved.length / actionableIssues.length) * 100)
+    : 100;
 
   const clampedScore = Math.max(0, Math.min(100, readinessScore));
+
+  // Count unresolved intrinsic-usage issues for the ignore button
+  const intrinsicUsageCount = result.issues.filter(
+    i => i.category === 'intrinsics' && i.severity === 'info' && i.status === 'unresolved'
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -86,6 +139,15 @@ export function Dashboard({ result, onViewIssues, onUpdateResult }: DashboardPro
           </p>
         </div>
         <div className="flex gap-3">
+          {intrinsicUsageCount > 0 && (
+            <button
+              onClick={handleIgnoreIntrinsicUsage}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <EyeOff className="w-4 h-4" />
+              Dismiss SSE Usage ({intrinsicUsageCount})
+            </button>
+          )}
           {summary.autoResolvable > 0 && (
             <button
               onClick={handleAutoResolve}
@@ -130,6 +192,75 @@ export function Dashboard({ result, onViewIssues, onUpdateResult }: DashboardPro
             : 'Significant changes needed for Graviton compatibility.'}
         </p>
       </div>
+
+      {/* Project Info Panel */}
+      {projectInfo && (
+        <div className="glass-panel p-5">
+          <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+            <FileCode className="w-4 h-4 text-graviton-400" />
+            Project Detection
+          </h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-3">
+            <div>
+              <p className="text-xs text-gray-500">Language</p>
+              <p className="text-sm text-white font-medium">
+                {projectInfo.languages?.length > 0 ? projectInfo.languages.map((l: any) => `${l.name} (${l.fileCount})`).join(', ') : 'Unknown'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Build System</p>
+              <p className="text-sm text-white font-medium">{projectInfo.buildSystem || 'None detected'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Dockerfile</p>
+              <p className={`text-sm font-medium ${projectInfo.hasDockerfile ? 'text-emerald-400' : 'text-red-400'}`}>
+                {projectInfo.hasDockerfile ? '✓ Present' : '✗ Missing'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Build Ready</p>
+              <p className={`text-sm font-medium ${projectInfo.missingForBuild?.length === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {projectInfo.missingForBuild?.length === 0 ? '✓ Yes' : `${projectInfo.missingForBuild.length} missing`}
+              </p>
+            </div>
+          </div>
+          {projectInfo.missingForBuild?.length > 0 && (
+            <div className="space-y-2 mb-3">
+              <p className="text-xs text-amber-400 font-medium mb-2">Missing for ARM64 validation:</p>
+              <div className="flex flex-wrap gap-2">
+                {projectInfo.missingForBuild.map((fileName: string, i: number) => (
+                  <button
+                    key={i}
+                    onClick={async () => {
+                      try {
+                        if (fileName === 'Dockerfile') {
+                          await generateDockerfile(result.id);
+                        } else {
+                          await generateMissingFile(result.id, fileName);
+                        }
+                        setGenerateSuccess(fileName);
+                        setTimeout(() => setGenerateSuccess(null), 3000);
+                        const info = await getProjectInfo(result.id);
+                        setProjectInfo(info);
+                      } catch {}
+                    }}
+                    className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5"
+                  >
+                    <FileCode className="w-3.5 h-3.5" />
+                    Generate {fileName}
+                  </button>
+                ))}
+              </div>
+              {generateSuccess && (
+                <div className="mt-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {generateSuccess} created successfully
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

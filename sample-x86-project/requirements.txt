@@ -1,5 +1,0 @@
-pip install --platform manylinux2014_aarch64 --only-binary=:all: --dry-run numpy
-pip install --platform manylinux2014_aarch64 --only-binary=:all: --dry-run scipy
-pip install --platform manylinux2014_aarch64 --only-binary=:all: --dry-run tensorflow
-flask==3.0.0
-requests==2.31.0

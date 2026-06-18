@@ -111,3 +111,26 @@ export async function checkCompatibility(packageName: string, ecosystem: string 
   if (!res.ok) throw new Error('Failed to check compatibility');
   return res.json();
 }
+
+
+export async function getProjectInfo(scanId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/scan/${scanId}/project-info`);
+  if (!res.ok) throw new Error('Failed to get project info');
+  return res.json();
+}
+
+export async function generateDockerfile(scanId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/scan/${scanId}/generate-dockerfile`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to generate Dockerfile');
+  return res.json();
+}
+
+export async function generateMissingFile(scanId: string, fileName: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/scan/${scanId}/generate-file`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileName }),
+  });
+  if (!res.ok) throw new Error(`Failed to generate ${fileName}`);
+  return res.json();
+}

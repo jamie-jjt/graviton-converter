@@ -9,6 +9,7 @@ import { CostEstimator } from './engine/cost-estimator';
 import { ReportGenerator } from './engine/report-generator';
 import { DependencyAnalyzer } from './engine/dependency-analyzer';
 import { lookupPackage, npmCompatDb, pythonCompatDb } from './engine/compatibility-db';
+import { ProjectDetector } from './engine/project-detector';
 
 const app = express();
 const PORT = 3001;
@@ -485,6 +486,104 @@ app.get('/api/compatibility/:package', (req, res) => {
     ecosystem,
     found: true,
   });
+});
+
+// GET /api/scan/:id/project-info - Detect project language, build system, missing files
+app.get('/api/scan/:id/project-info', async (req, res) => {
+  const result = scanResults.get(req.params.id);
+  if (!result) {
+    return res.status(404).json({ error: 'Scan not found' });
+  }
+
+  if (result.source.type !== 'local') {
+    return res.status(400).json({ error: 'Project info only available for local scans' });
+  }
+
+  try {
+    const detector = new ProjectDetector(result.source.path);
+    const info = await detector.detect();
+    res.json(info);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to detect project info' });
+  }
+});
+
+// POST /api/scan/:id/generate-dockerfile - Generate and write a Dockerfile
+app.post('/api/scan/:id/generate-dockerfile', async (req, res) => {
+  const result = scanResults.get(req.params.id);
+  if (!result) {
+    return res.status(404).json({ error: 'Scan not found' });
+  }
+
+  if (result.source.type !== 'local') {
+    return res.status(400).json({ error: 'Dockerfile generation only available for local scans' });
+  }
+
+  try {
+    const detector = new ProjectDetector(result.source.path);
+    const info = await detector.detect();
+
+    if (info.hasDockerfile) {
+      return res.status(400).json({ error: 'Project already has a Dockerfile' });
+    }
+
+    if (!info.suggestedDockerfile) {
+      return res.status(400).json({ error: 'Could not determine appropriate Dockerfile for this project' });
+    }
+
+    const success = detector.writeDockerfile(info.suggestedDockerfile);
+    if (!success) {
+      return res.status(500).json({ error: 'Failed to write Dockerfile' });
+    }
+
+    res.json({
+      success: true,
+      content: info.suggestedDockerfile,
+      message: `Dockerfile generated for ${info.languages[0]?.name || 'unknown'} project`,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to generate Dockerfile' });
+  }
+});
+
+// POST /api/scan/:id/generate-file - Generate any missing file
+app.post('/api/scan/:id/generate-file', async (req, res) => {
+  const { fileName } = req.body;
+  const result = scanResults.get(req.params.id);
+
+  if (!result) {
+    return res.status(404).json({ error: 'Scan not found' });
+  }
+  if (result.source.type !== 'local') {
+    return res.status(400).json({ error: 'File generation only available for local scans' });
+  }
+  if (!fileName) {
+    return res.status(400).json({ error: 'fileName is required' });
+  }
+
+  try {
+    const detector = new ProjectDetector(result.source.path);
+    const info = await detector.detect();
+    const content = detector.generateMissingFile(fileName, info.languages);
+
+    if (!content) {
+      return res.status(400).json({ error: `Cannot generate ${fileName} for this project` });
+    }
+
+    const success = detector.writeFile(fileName, content);
+    if (!success) {
+      return res.status(400).json({ error: `${fileName} already exists or could not be written` });
+    }
+
+    res.json({
+      success: true,
+      fileName,
+      content,
+      message: `${fileName} generated successfully`,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to generate file' });
+  }
 });
 
 app.listen(PORT, () => {

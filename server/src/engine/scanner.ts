@@ -122,7 +122,7 @@ export function createScanSummary(issues: ConversionIssue[], totalFiles: number,
     critical: issues.filter(i => i.severity === 'critical').length,
     warnings: issues.filter(i => i.severity === 'warning').length,
     info: issues.filter(i => i.severity === 'info').length,
-    autoResolvable: issues.filter(i => i.autoResolvable).length,
+    autoResolvable: issues.filter(i => i.autoResolvable && i.status === 'unresolved').length,
     resolved: issues.filter(i => i.status === 'auto-resolved' || i.status === 'manually-resolved').length,
   };
 }
